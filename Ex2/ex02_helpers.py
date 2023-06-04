@@ -46,6 +46,7 @@ def Downsample(dim, dim_out=None):
     )
 
 
+# extract the appropriate t index for a batch of indices
 def extract(a, t, x_shape):
     batch_size = t.shape[0]
     out = a.gather(-1, t.cpu())

@@ -10,8 +10,10 @@ from pathlib import Path
 import os
 
 from ex02_model import Unet
-from ex02_diffusion import Diffusion, linear_beta_schedule
+from ex02_diffusion import Diffusion, linear_beta_schedule, cosine_beta_schedule
 from torchvision.utils import save_image
+
+import matplotlib.pyplot as plt
 
 import argparse
 
@@ -32,14 +34,33 @@ def parse_args():
     return parser.parse_args()
 
 
-def sample_and_save_images(n_images, diffusor, model, device, store_path):
+def sample_and_save_images(n_images, diffusor, model, image_size, device, store_path):
     # TODO: Implement - adapt code and method signature as needed
-    pass
+    channels = 3
+    for i in range(n_images):
+        images = diffusor.sample(model, image_size, batch_size=1, channels=channels)
+        s_image = images[-1].cpu().numpy().reshape(32, 32, 3)
+        # normalizing hte image
+        s_image = (s_image - np.min(s_image)) / (np.max(s_image) - np.min(s_image))
+        plt.imsave(os.path.join(store_path, f"sample-{i}.png"), s_image)
 
 
 def test(model, testloader, diffusor, device, args):
-    # TODO: Implement - adapt code and method signature as needed
-    pass
+    # TODO (2.2): implement testing functionality, including generation of stored images.
+
+    # you can use the loss for a defined test set at specific time-steps as one criterion, but you can also look
+    # deeper into possible metrics
+    timesteps = 10
+    loss = 0
+    with torch.no_grad():
+        for data, target in testloader:
+            images = data.to(device)
+            t = torch.randint(0, timesteps, (len(images),), device=device).long()
+            loss += diffusor.p_losses(model, images, t, loss_type="l2").item()
+            if args.dry_run:
+                break
+    loss /= len(testloader)
+    print("TEST LOSS: ", loss)
 
 
 def train(model, trainloader, optimizer, diffusor, epoch, device, args):
@@ -67,11 +88,6 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
             break
 
 
-def test(args):
-    # TODO (2.2): implement testing functionality, including generation of stored images.
-    pass
-
-
 def run(args):
     timesteps = args.timesteps
     image_size = 32  # TODO (2.5): Adapt to new dataset
@@ -84,7 +100,8 @@ def run(args):
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
     my_scheduler = lambda x: linear_beta_schedule(0.0001, 0.02, x)
-    diffusor = Diffusion(timesteps, my_scheduler, image_size, device)
+    my_cosine_scheduler = lambda x: cosine_beta_schedule(x)
+    diffusor = Diffusion(timesteps, my_cosine_scheduler, image_size, device)
 
     # define image transformations (e.g. using torchvision)
     transform = Compose([
@@ -115,10 +132,15 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    save_path = "<path/to/my/images>"  # TODO: Adapt to your needs
+    save_path = "images_cosine_1/"  # TODO: Adapt to your needs
     n_images = 8
-    sample_and_save_images(n_images, diffusor, model, device, save_path)
-    torch.save(model.state_dict(), os.path.join("/proj/aimi-adl/models", args.run_name, f"ckpt.pt"))
+    sample_and_save_images(n_images, diffusor, model, image_size, device, save_path)
+    # torch.save(model.state_dict(), os.path.join("/proj/aimi-adl/models", args.run_name, f"ckpt.pt"))
+
+
+def visualize():
+    # TODO (2.2): Add visualization capabilities
+    pass
 
 
 if __name__ == '__main__':

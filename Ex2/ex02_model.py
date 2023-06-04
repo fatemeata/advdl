@@ -8,7 +8,8 @@ from ex02_helpers import *
 
 
 # Note: This code employs large parts of the following sources:
-# Niels Rogge (nielsr) & Kashif Rasul (kashif): https://huggingface.co/blog/annotated-diffusion (last access: 23.05.2023),
+# Niels Rogge (nielsr) & Kashif Rasul (kashif): https://huggingface.co/blog/annotated-diffusion
+# (last access: 23.05.2023),
 # which is based on
 # Phil Wang (lucidrains): https://github.com/lucidrains/denoising-diffusion-pytorch (last access: 23.05.2023)
 
@@ -81,7 +82,7 @@ class ResnetBlock(nn.Module):
         self.mlp = nn.Sequential(
             nn.SiLU(),
             nn.Linear(int(time_emb_dim) + int(classes_emb_dim), dim_out * 2)
-        ) if exists(time_emb_dim) or exists(classes_emb_dim) else None
+        ) if exists(time_emb_dim) and exists(classes_emb_dim) else None
 
         self.block1 = Block(dim, dim_out, groups=groups)
         self.block2 = Block(dim_out, dim_out, groups=groups)
@@ -174,7 +175,8 @@ class PreNorm(nn.Module):
         return self.fn(x)
 
 
-# TODO: make yourself familiar with the code that is presented here, as it closely interacts with the rest of the exercise.
+# TODO: make yourself familiar with the code that is presented here, as it closely interacts
+#  with the rest of the exercise.
 class Unet(nn.Module):
     def __init__(
         self,
@@ -222,7 +224,6 @@ class Unet(nn.Module):
         # TODO: Adapt all blocks accordingly such that they can accommodate a class embedding as well
         for ind, (dim_in, dim_out) in enumerate(in_out):
             is_last = ind >= (num_resolutions - 1)
-
             self.downs.append(
                 nn.ModuleList(
                     [
@@ -270,9 +271,11 @@ class Unet(nn.Module):
         t = self.time_mlp(time)
 
         # TODO: Implement the class conditioning. Keep in mind that
-        #  - for each element in the batch, the class embedding is replaced with the null token with a certain probability during training
+        #  - for each element in the batch, the class embedding is replaced with the null token with a certain
+        #  probability during training
         #  - during testing, you need to have control over whether the conditioning is applied or not
-        #  - analogously to the time embedding, the class embedding is provided in every ResNet block as additional conditioning
+        #  - analogously to the time embedding, the class embedding is provided in every ResNet block as additional
+        #  conditioning
 
 
         h = []

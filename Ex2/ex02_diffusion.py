@@ -92,7 +92,7 @@ class Diffusion:
         # Equation 11 in the paper
         # Use our model (noise predictor) to predict the mean
         model_mean = sqrt_recip_alphas_t * (
-                x - betas_t * model(x, t) / sqrt_one_minus_alphas_cumprod_t
+                x - betas_t * model.predict(x, t) / sqrt_one_minus_alphas_cumprod_t
         )
         # TODO (2.2): The method should return the image at timestep t-1.
         if t_index == 0:
@@ -134,14 +134,14 @@ class Diffusion:
 
         return noisy_image
 
-    def p_losses(self, denoise_model, x_zero, t, noise=None, loss_type="l1"):
+    def p_losses(self, denoise_model, x_zero, t, classes, noise=None, loss_type="l1"):
         # TODO (2.2): compute the input to the network using the forward diffusion process and predict the noise using
         #  the model; if noise is None, you will need to create a new noise vector, otherwise use the provided one.
         if noise is None:
             noise = torch.randn_like(x_zero)
 
         x_noisy = self.q_sample(x_zero=x_zero, t=t, noise=noise)
-        predicted_noise = denoise_model(x_noisy, t)
+        predicted_noise = denoise_model(x_noisy, t, classes=classes)
         if loss_type == 'l1':
             # TODO (2.2): implement an L1 loss for this task
             loss = F.l1_loss(noise, predicted_noise)

@@ -1,3 +1,10 @@
+import argparse
+import os
+from pathlib import Path
+
+import numpy as np
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -5,17 +12,10 @@ from torch.optim import AdamW
 from torchvision.transforms import Compose, ToTensor, Lambda, ToPILImage, CenterCrop, Resize
 from torchvision import datasets, transforms
 from tqdm import tqdm
-import numpy as np
-from pathlib import Path
-import os
 
 from ex02_model import Unet
 from ex02_diffusion import Diffusion, linear_beta_schedule, cosine_beta_schedule
 from torchvision.utils import save_image
-
-import matplotlib.pyplot as plt
-
-import argparse
 
 
 def parse_args():
@@ -33,36 +33,6 @@ def parse_args():
     parser.add_argument('--dry_run', action='store_true', default=False, help='quickly check a single pass')
     return parser.parse_args()
 
-
-def sample_and_save_images(n_images, diffusor, model, image_size, device, store_path):
-    # TODO: Implement - adapt code and method signature as needed
-    channels = 3
-    for i in range(n_images):
-        images = diffusor.sample(model, image_size, batch_size=1, channels=channels)
-        s_image = images[-1].cpu().numpy().reshape(32, 32, 3)
-        # normalizing hte image
-        s_image = (s_image - np.min(s_image)) / (np.max(s_image) - np.min(s_image))
-        plt.imsave(os.path.join(store_path, f"sample-{i}.png"), s_image)
-
-
-def test(model, testloader, diffusor, device, args):
-    # TODO (2.2): implement testing functionality, including generation of stored images.
-
-    # you can use the loss for a defined test set at specific time-steps as one criterion, but you can also look
-    # deeper into possible metrics
-    timesteps = 10
-    loss = 0
-    with torch.no_grad():
-        for data, target in testloader:
-            images = data.to(device)
-            t = torch.randint(0, timesteps, (len(images),), device=device).long()
-            loss += diffusor.p_losses(model, images, t, loss_type="l2").item()
-            if args.dry_run:
-                break
-    loss /= len(testloader)
-    print("TEST LOSS: ", loss)
-
-
 def train(model, trainloader, optimizer, diffusor, epoch, device, args):
     batch_size = args.batch_size
     timesteps = args.timesteps
@@ -71,11 +41,11 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
     for step, (images, labels) in enumerate(pbar):
 
         images = images.to(device)
+        labels = labels.to(device)
         optimizer.zero_grad()
-
         # Algorithm 1 line 3: sample t uniformly for every example in the batch
         t = torch.randint(0, timesteps, (len(images),), device=device).long()
-        loss = diffusor.p_losses(model, images, t, loss_type="l2")
+        loss = diffusor.p_losses(model, images, t, labels, loss_type="l2")
 
         loss.backward()
         optimizer.step()
@@ -87,19 +57,65 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
         if args.dry_run:
             break
 
+def test(model, testloader, diffusor, device, args):
+    # TODO: Implement - adapt code and method signature as needed
+    timesteps = 5 # just 5 timestamps for test
+    loss = 0
+    with torch.no_grad():
+        pbar = tqdm(testloader)
+        for step, (images, labels) in enumerate(pbar):
+
+            images = images.to(device)
+            labels = labels.to(device)
+            # Algorithm 1 line 3: sample t uniformly for every example in the batch
+            t = torch.randint(0, timesteps, (len(images),), device=device).long()
+            loss += diffusor.p_losses(model, images, t, labels, loss_type="l2").item()
+
+
+    loss /= len(testloader)
+    print("Test Loss is {:.4f}".format(loss))
+    return loss
+
+def sample_and_save_images(n_images, image_size, diffusor, model, device, store_path):
+    # TODO: Implement - adapt code and method signature as needed
+    batch_size = 8
+    num_samples = n_images // batch_size
+    images = []
+    for _ in range(num_samples):
+        images.append(diffusor.sample(model, image_size, batch_size=batch_size, channels=3))
+
+    imgs = images[0][-1] # one batch for visualisation
+    imgs = imgs.cpu().numpy()
+    imgs = imgs.reshape(batch_size, image_size, image_size, -1)
+    nrows = (batch_size // 3) + 1
+    ncols = 3
+    fig, ax = plt.subplots(nrows, ncols)
+    for i in range(len(imgs)):
+        img = imgs[i]
+        img = (img - np.min(img)) /(np.max(img) - np.min(img)) # normalize to 0 - 1
+
+        row = i // 3
+        col = i % 3
+        ax[row, col].imshow(img)
+    plt.savefig(os.path.join(store_path, "1.png"))
 
 def run(args):
     timesteps = args.timesteps
     image_size = 32  # TODO (2.5): Adapt to new dataset
     channels = 3
+    num_classes = 10
     epochs = args.epochs
     batch_size = args.batch_size
     device = "cuda" if not args.no_cuda and torch.cuda.is_available() else "cpu"
 
-    model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,)).to(device)
+    model = Unet(dim=image_size,
+                    channels=channels,
+                    dim_mults=(1, 2, 4,),
+                    class_free_guidance=False,
+                    num_classes=num_classes).to(device)
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
-    my_scheduler = lambda x: linear_beta_schedule(0.0001, 0.02, x)
+    my_linear_scheduler = lambda x: linear_beta_schedule(0.0001, 0.02, x)
     my_cosine_scheduler = lambda x: cosine_beta_schedule(x)
     diffusor = Diffusion(timesteps, my_cosine_scheduler, image_size, device)
 
@@ -132,16 +148,10 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    save_path = "images_cosine_1/"  # TODO: Adapt to your needs
+    save_path = "./images"  # TODO: Adapt to your needs
     n_images = 8
-    sample_and_save_images(n_images, diffusor, model, image_size, device, save_path)
-    # torch.save(model.state_dict(), os.path.join("/proj/aimi-adl/models", args.run_name, f"ckpt.pt"))
-
-
-def visualize():
-    # TODO (2.2): Add visualization capabilities
-    pass
-
+    sample_and_save_images(n_images, image_size, diffusor, model, device, save_path)
+    torch.save(model.state_dict(), os.path.join("./models", args.run_name, f"ckpt.pt"))
 
 if __name__ == '__main__':
     args = parse_args()

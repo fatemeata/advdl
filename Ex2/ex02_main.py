@@ -39,7 +39,6 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
 
     pbar = tqdm(trainloader)
     for step, (images, labels) in enumerate(pbar):
-
         images = images.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
@@ -76,7 +75,7 @@ def test(model, testloader, diffusor, device, args):
     print("Test Loss is {:.4f}".format(loss))
     return loss
 
-def sample_and_save_images(n_images, image_size, diffusor, model, device, store_path):
+def sample_and_save_images(n_images, image_size, diffusor, model, device, store_path, reverse_transform):
     # TODO: Implement - adapt code and method signature as needed
     batch_size = 8
     num_samples = n_images // batch_size
@@ -85,14 +84,12 @@ def sample_and_save_images(n_images, image_size, diffusor, model, device, store_
         images.append(diffusor.sample(model, image_size, batch_size=batch_size, channels=3))
 
     imgs = images[0][-1] # one batch for visualisation
-    imgs = imgs.cpu().numpy()
-    imgs = imgs.reshape(batch_size, image_size, image_size, -1)
     nrows = (batch_size // 3) + 1
     ncols = 3
     fig, ax = plt.subplots(nrows, ncols)
     for i in range(len(imgs)):
         img = imgs[i]
-        img = (img - np.min(img)) /(np.max(img) - np.min(img)) # normalize to 0 - 1
+        img = reverse_transform(img)
 
         row = i // 3
         col = i % 3
@@ -129,7 +126,7 @@ def run(args):
         Lambda(lambda t: (t.clamp(-1, 1) + 1) / 2),
         Lambda(lambda t: t.permute(1, 2, 0)),  # CHW to HWC
         Lambda(lambda t: t * 255.),
-        Lambda(lambda t: t.numpy().astype(np.uint8)),
+        Lambda(lambda t: t.cpu().numpy().astype(np.uint8)),
         ToPILImage(),
     ])
 
@@ -150,7 +147,7 @@ def run(args):
 
     save_path = "./images"  # TODO: Adapt to your needs
     n_images = 8
-    sample_and_save_images(n_images, image_size, diffusor, model, device, save_path)
+    sample_and_save_images(n_images, image_size, diffusor, model, device, save_path, reverse_transform)
     torch.save(model.state_dict(), os.path.join("./models", args.run_name, f"ckpt.pt"))
 
 if __name__ == '__main__':

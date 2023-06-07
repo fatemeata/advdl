@@ -126,10 +126,10 @@ class Diffusion:
         if noise is None:
             noise = torch.randn_like(x_zero)
 
-        sqrt_alphas_cumprod_t = extract(self.sqrt_alphas_cumprod, t, x_zero.shape)
+        sqrt_alphas_cumprod_t = extract(self.sqrt_alphas_cumprod, t, x_zero.shape).to("cuda")
         sqrt_one_minus_alphas_cumprod_t = extract(
             self.sqrt_one_minus_alphas_cumprod, t, x_zero.shape
-        )
+        ).to("cuda")
         noisy_image = sqrt_alphas_cumprod_t * x_zero + sqrt_one_minus_alphas_cumprod_t * noise
 
         return noisy_image

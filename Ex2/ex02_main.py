@@ -202,7 +202,7 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    random_index = 16  # choose a number less than 16 :))
+    random_index = 15  # choose a number less than 16 :))
     visualize_test(model, testloader, diffusor, device, save_path, reverse_transform, random_index)
 
     n_images = 8

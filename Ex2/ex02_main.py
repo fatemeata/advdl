@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 import torch
 import torch.nn.functional as F
@@ -150,6 +151,32 @@ def sample_and_save_images(n_images, image_size, diffusor, model, device, store_
     plt.savefig(os.path.join(store_path, "1.png"))
 
 
+def visualize_sampling(n_samples, model, diffusor, image_size, store_path, reverse_transform):
+    random_index = 5
+    batch_size = 8
+    channels = 3
+    timesteps = 100
+    images = []
+
+    for _ in range(n_samples):
+        samples = diffusor.sample(model, image_size, batch_size=batch_size, channels=channels)
+        images.append(samples)
+
+    fig = plt.figure()
+    ims = []
+    for i in range(timesteps):
+        image_tensor = samples[i][random_index]
+        print("image tensor shape: ", image_tensor.shape)
+        image_array = reverse_transform(image_tensor)
+        # Plot the image using Matplotlib
+        im = plt.imshow(image_array, cmap="gray", animated=True)
+        ims.append([im])
+
+    animate = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
+    animate.save(os.path.join(store_path, "diffusion.gif"))
+    plt.show()
+
+
 def run(args):
     timesteps = args.timesteps
     image_size = 32  # TODO (2.5): Adapt to new dataset
@@ -203,11 +230,11 @@ def run(args):
     test(model, testloader, diffusor, device, args)
 
     random_index = 15  # choose a number less than 16 :))
-    visualize_test(model, testloader, diffusor, device, save_path, reverse_transform, random_index)
+    # visualize_test(model, testloader, diffusor, device, save_path, reverse_transform, random_index)
 
     n_images = 8
+    visualize_sampling(n_images, model, diffusor, image_size, save_path, reverse_transform)
     sample_and_save_images(n_images, image_size, diffusor, model, device, save_path, reverse_transform)
-    # visualize_diffusion_forward(model, testloader, diffusor, device, image_size)
     # torch.save(model.state_dict(), os.path.join("models/", args.run_name, f"ckpt.pt"))
 
 

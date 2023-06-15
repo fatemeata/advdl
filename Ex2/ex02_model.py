@@ -174,7 +174,8 @@ class PreNorm(nn.Module):
         return self.fn(x)
 
 
-# TODO: make yourself familiar with the code that is presented here, as it closely interacts with the rest of the exercise.
+# TODO: make yourself familiar with the code that is presented here, as it closely interacts
+#  with the rest of the exercise.
 class Unet(nn.Module):
     def __init__(
         self,
@@ -286,7 +287,7 @@ class Unet(nn.Module):
             classes_emb = self.classes_emb(classes)
             p_uncond = default(p_uncond, self.p_uncond)
             if p_uncond > 0:
-                
+
                 keep_mask = prob_mask_like((batch,), 1 - p_uncond, device = device)
                 null_classes_emb = repeat(self.null_classes_emb, 'd -> b d', b = batch)
 
@@ -304,10 +305,12 @@ class Unet(nn.Module):
         t = self.time_mlp(time)
 
         # TODO: Implement the class conditioning. Keep in mind that
-        #  - for each element in the batch, the class embedding is replaced with the null token with a certain probability during training
+        #  - for each element in the batch, the class embedding is replaced with the null token with a certain
+        #  probability during training
         #  - during testing, you need to have control over whether the conditioning is applied or not
-        #  - analogously to the time embedding, the class embedding is provided in every ResNet block as additional conditioning
-        
+        #  - analogously to the time embedding, the class embedding is provided in every ResNet block as additional
+        #  conditioning
+
 
         h = []
 
@@ -355,9 +358,9 @@ class Unet(nn.Module):
         guidance_weighted_logits = (1 + guidance_factor)*logits - guidance_factor*null_logits
         return guidance_weighted_logits
 
-    def predict(self, *args, 
-                guidance_factor = 6.0,
-                classes = None,
+    def predict(self, *args,
+                guidance_factor=6.0,
+                classes=None,
                 **kwargs):
         if self.class_free_guidance:
             classes = default(classes,  torch.randint(0, self.num_classes, (8,)).cuda())

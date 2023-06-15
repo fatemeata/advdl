@@ -24,8 +24,9 @@ def cosine_beta_schedule(timesteps, s=0.008):
     f = torch.cos(((t + s)/(1+s))*math.pi*0.5) ** 2
     alphas = f/f[0]
     betas = 1 - (alphas[1:]/alphas[:-1])
-    betas = torch.clip(betas, 0, 0.999)
+    betas = torch.clip(betas, 0, 0.02)
     return betas
+
 
 def sigmoid_beta_schedule(beta_start, beta_end, timesteps, clip_min=1e-9):
     """
@@ -76,7 +77,7 @@ class Diffusion:
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - self.alphas_cumprod)
 
         # calculations for posterior q(x_{t-1} | x_t, x_0)
-        self.posterior_variance = self.betas * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
+        # self.posterior_variance = self.betas * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
 
     @torch.no_grad()
     def p_sample(self, model, x, t, t_index):
@@ -98,17 +99,18 @@ class Diffusion:
         if t_index == 0:
             return model_mean
         else:
-            posterior_variance_t = extract(self.posterior_variance, t, x.shape)
+            # posterior_variance_t = extract(self.posterior_variance, t, x.shape)
+            posterior_variance_t = betas_t
             noise = torch.randn_like(x)
             image_t_1 = model_mean + torch.sqrt(posterior_variance_t) * noise
             return image_t_1
 
     # Algorithm 2 (including returning all images)
     @torch.no_grad()
-    def sample(self, model, image_size, batch_size=16, channels=3):
+    def sample(self, model, image_size, batch_size=16, channels=3, device="cuda"):
         # TODO (2.2): Implement the full reverse diffusion loop from random noise to an image, iteratively ''reducing''
         #  the noise in the generated image.
-        device = next(model.parameters()).device
+        # device = next(model.parameters()).device
         image = torch.randn((batch_size, channels, image_size, image_size), device=device)
         images = [image]
 

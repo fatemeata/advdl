@@ -275,7 +275,15 @@ class JEM(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, dataset_idx=None):
         # TODO (3.4)
-        pass
+        real_imgs, labels = batch
+        # synth_imgs = torch.rand_like(real_imgs) * 2 - 1
+        synth_imgs = torch.rand_like(real_imgs)
+
+        inp_imgs = torch.cat([real_imgs, synth_imgs], dim=0)
+        real_out, synth_out = self.cnn(inp_imgs).chunk(2, dim=0)
+        cdiv = synth_out.mean() - real_out.mean()
+        return cdiv
+
 
 def run_training(args) -> pl.LightningModule:
     """
